@@ -1,11 +1,11 @@
-#!/usr/bin/env python3
+
 
 # Import Dependencies
 import rospy 
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Float64
 from turtlesim.msg import Pose
-import time 
+import math
 
 class TurtlesimStraightsAndTurns:
     def __init__(self):
@@ -16,14 +16,19 @@ class TurtlesimStraightsAndTurns:
         self.dist_goal_active = False
         self.forward_movement = True
 
+        self.last_angle = 0
+        self.goal_angle = 0
+        self.angle_goal_active = False
+        self.clockwise_rotation = True
+
         # Initialize the node
         rospy.init_node('turtlesim_straights_and_turns_node', anonymous=True)
 
         # Initialize subscribers  
-        rospy.Subscriber("/turtle_dist", Float64,self.distance_callback)
-        rospy.Subscriber("/goal_angle", Float64,self.goal_angle_callback)
-        rospy.Subscriber("/goal_distance", Float64,self.goal_distance_callback)
-        rospy.Subscriber("/turtle1/pose", Pose,self.pose_callback)
+        rospy.Subscriber("/turtle_dist", Float64, self.distance_callback)
+        rospy.Subscriber("/goal_angle", Float64, self.goal_angle_callback)
+        rospy.Subscriber("/goal_distance", Float64, self.goal_distance_callback)
+        rospy.Subscriber("/turtle1/pose", Pose, self.pose_callback)
 
         # Initialize publishers
         self.velocity_publisher = rospy.Publisher('/turtle1/cmd_vel', Twist, queue_size=10)
@@ -33,40 +38,215 @@ class TurtlesimStraightsAndTurns:
         rospy.Timer(rospy.Duration(timer_period), self.timer_callback)
 
         # Printing to the terminal, ROS style
-        rospy.loginfo("Initalized node!")
+        rospy.loginfo("Initialized node!")
         
         # This blocking function call keeps python from exiting until node is stopped
         rospy.spin()
 
-    def pose_callback(self,msg):
-        pass
+    def pose_callback(self, msg):
+        self.last_angle = msg.theta
 
-    def distance_callback(self,msg):
+    def distance_callback(self, msg):
         self.last_distance = msg.data
 
-    def goal_angle_callback(self,msg):
-        pass
+    def goal_angle_callback(self, msg):
+        goal_angle = msg.data
+        if goal_angle != 0:
+            # Set the goal angle
+            # Ensure the angle is within the range [-pi, pi]
+            if goal_angle > math.pi:
+                goal_angle -= 2 * math.pi
+            if goal_angle < -math.pi:
+                goal_angle += 2 * math.pi
+            self.goal_angle = goal_angle
+            self.angle_goal_active = True
+            self.clockwise_rotation = True if self.goal_angle > 0 else False
+        else:
+            self.angle_goal_active = False
 
-    def goal_distance_callback(self,msg):
-        ########## YOUR CODE GOES HERE ##########
-        # Set goal_distance, dist_goal_active and forward_movement variables here
+    def goal_distance_callback(self, msg):
+        self.goal_distance = msg.data
+        self.dist_goal_active = True if self.goal_distance != 0 else False
+        self.forward_movement = True if self.goal_distance > 0 else False
 
+    def timer_callback(self, msg):
+        if self.dist_goal_active:
 
-        ###########################################
+            # Check if the distance goal is reached
+            if abs(self.last_distance - self.goal_distance) >= 0.01:
+                dist = Twist()
+                dist.linear.x = self.goal_distance
+                 # Stop the turtle
+                self.velocity_publisher.publish(dist)
+                self.dist_goal_active = False
+            else:
 
-    def timer_callback(self,msg):
-        ########## YOUR CODE GOES HERE ##########
-        # If a goal is active, first check if the goal is reached (it's OK if the goal is not perfectly reached)
-        # Then publish a cmd_vel message
+                 # Publish cmd_vel message to move the turtle
+                twist_msg = Twist()
+                twist_msg.linear.x = 1 if self.forward_movement else -1
+                self.velocity_publisher.publish(twist_msg)
 
+        if self.angle_goal_active:
 
+             # Check if the angle goal is reached
+            # if abs(self.last_angle - self.goal_angle) >= 0.01:
+            #      # Stop the turtle
+            #     angle = Twist()
+            #     angle.angular.z = self.goal_angle
+            #     self.velocity_publisher.publish(angle)
+            #     self.angle_goal_active = False
+            # else:
+            #      # Publish cmd_vel message to rotate the turtle
+            #     twist_msg = Twist()
+            #     twist_msg.angular.z = 1 if self.clockwise_rotation else -1
+            #     self.velocity_publisher.publish(twist_msg)
+            # Compute the difference between current angle and goal angle
+            angle_diff = self.goal_angle - self.last_angle
 
-        ###########################################
+            # Handle the wrap-around condition for angle difference
+            if angle_diff > math.pi:
+                angle_diff -= 2 * math.pi
+            if angle_diff < -math.pi:
+                angle_diff += 2 * math.pi
 
+            # Check if the angle goal is reached
+            if abs(angle_diff) >= 0.01:
+                # Publish cmd_vel message to rotate the turtle
+                twist_msg = Twist()
+                
+                # If there's a full rotation needed first, do that
+                if abs(angle_diff) > math.pi:
+                    twist_msg.angular.z = 1 if self.clockwise_rotation else -1
+                else:
+                    # Otherwise, rotate according to the leftover rotation
+                    twist_msg.angular.z = angle_diff
+                
+                self.velocity_publisher.publish(twist_msg)
+            else:
+                # Stop the turtle
+                self.angle_goal_active = False
 if __name__ == '__main__': 
-
     try: 
         turtlesim_straights_and_turns_class_instance = TurtlesimStraightsAndTurns()
     except rospy.ROSInterruptException: 
         pass
+
+#!/usr/bin/env python3
+
+# import rospy 
+# from geometry_msgs.msg import Twist
+# from std_msgs.msg import Float64
+# from turtlesim.msg import Pose
+# import math
+
+# class TurtlesimStraightsAndTurns:
+#     def __init__(self):
         
+#         # Initialize class variables
+#         self.last_distance = 0
+#         self.goal_distance = 0
+#         self.dist_goal_active = False
+#         self.forward_movement = True
+
+#         self.last_angle = 0
+#         self.goal_angle = 0
+#         self.angle_goal_active = False
+#         self.clockwise_rotation = True
+
+#         # Initialize the node
+#         rospy.init_node('turtlesim_straights_and_turns_node', anonymous=True)
+
+#         # Initialize subscribers  
+#         rospy.Subscriber("/turtle_dist", Float64, self.distance_callback)
+#         rospy.Subscriber("/goal_angle", Float64, self.goal_angle_callback)
+#         rospy.Subscriber("/goal_distance", Float64, self.goal_distance_callback)
+#         rospy.Subscriber("/turtle1/pose", Pose, self.pose_callback)
+
+#         # Initialize publishers
+#         self.velocity_publisher = rospy.Publisher('/turtle1/cmd_vel', Twist, queue_size=10)
+
+#         # Initialize a timer. The timer callback will act as our main function
+#         timer_period = 0.01
+#         rospy.Timer(rospy.Duration(timer_period), self.timer_callback)
+
+#         # Printing to the terminal, ROS style
+#         rospy.loginfo("Initialized node!")
+        
+#     def pose_callback(self, msg):
+#         self.last_angle = msg.theta
+
+#     def distance_callback(self, msg):
+#         self.last_distance = msg.data
+
+#     def goal_angle_callback(self, msg):
+#         goal_angle = msg.data
+#         if goal_angle != 0:
+#             # Ensure the angle is within the range [-pi, pi]
+#             # Set the goal angle
+#             self.goal_angle = goal_angle
+#             self.angle_goal_active = True
+#             self.clockwise_rotation = True if self.goal_angle > 0 else False
+#         else:
+#             self.angle_goal_active = False
+
+#     def goal_distance_callback(self, msg):
+#         self.goal_distance = msg.data
+#         self.dist_goal_active = True if self.goal_distance != 0 else False
+#         self.forward_movement = True if self.goal_distance > 0 else False
+
+#     def timer_callback(self, msg):
+#         if self.dist_goal_active:
+#             # Check if the distance goal is reached
+#             if abs(self.last_distance - self.goal_distance) <= 0.01:
+#                 dist = Twist()
+#                 dist.linear.x = self.goal_distance
+#                 # Stop the turtle
+#                 self.velocity_publisher.publish(dist)
+#                 self.dist_goal_active = False
+#             else:
+#                 # Publish cmd_vel message to move the turtle
+#                 twist_msg = Twist()
+#                 twist_msg.linear.x = 1 if self.forward_movement else -1
+#                 self.velocity_publisher.publish(twist_msg)
+
+#         if self.angle_goal_active:
+#             # Check if the angle goal is reached
+#             if abs(self.last_angle - self.goal_angle) <= 0.01:
+#                 # Stop the turtle
+#                 angle = Twist()
+#                 angle.angular.x = self.goal_angle
+#                 self.velocity_publisher.publish(angle)
+#                 self.angle_goal_active = False
+#             else:
+#                 # Publish cmd_vel message to rotate the turtle
+#                 twist_msg = Twist()
+#                 twist_msg.angular.z = 1 if self.clockwise_rotation else -1
+#                 self.velocity_publisher.publish(twist_msg)
+
+# def publish_goal_distance(goal_distance):
+#     rospy.wait_for_service('/goal_distance')
+#     try:
+#         pub = rospy.Publisher('/goal_distance', Float64, queue_size=10)
+#         pub.publish(goal_distance)
+#     except rospy.ServiceException as e:
+#         print("Service call failed:", e)
+
+# def publish_goal_angle(goal_angle):
+#     rospy.wait_for_service('/goal_angle')
+#     try:
+#         pub = rospy.Publisher('/goal_angle', Float64, queue_size=10)
+#         pub.publish(goal_angle)
+#     except rospy.ServiceException as e:
+#         print("Service call failed:", e)
+
+# if __name__ == '__main__':
+#     try:
+#         turtlesim_straights_and_turns_class_instance = TurtlesimStraightsAndTurns()
+        
+#         # Publish goal distance and goal angle
+#         publish_goal_distance(5.0)  # Change to any desired distance
+#         publish_goal_angle(1.5)      # Change to any desired angle
+
+#         rospy.spin() # Keep the script running
+#     except rospy.ROSInterruptException:
+#         pass
